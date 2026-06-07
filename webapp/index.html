@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>דיבור לטקסט</title>
+
+  <!-- PWA / install metadata -->
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#6C4DF6" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="דיבור לטקסט" />
+  <link rel="icon" href="icon.svg" />
+  <link rel="apple-touch-icon" href="icon.svg" />
+
+  <style>
+    :root {
+      --accent: #6C4DF6;
+      --accent-2: #9b8bff;
+      --rec: #e5484d;
+      --bg: #0f1020;
+      --surface: #1b1c30;
+      --on-surface: #ecebf5;
+      --muted: #9a99b5;
+      --border: #2c2d47;
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #f5f5fb;
+        --surface: #ffffff;
+        --on-surface: #1a1a2e;
+        --muted: #6b6b85;
+        --border: #e3e3ef;
+      }
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: radial-gradient(1200px 800px at 50% -10%, rgba(108,77,246,0.18), transparent), var(--bg);
+      color: var(--on-surface);
+      display: flex;
+      flex-direction: column;
+      min-height: 100dvh;
+      padding: env(safe-area-inset-top) 16px calc(env(safe-area-inset-bottom) + 16px);
+    }
+    header {
+      text-align: center;
+      padding: 18px 0 10px;
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+    }
+    .toolbar {
+      display: flex;
+      justify-content: flex-start;
+      gap: 8px;
+      min-height: 36px;
+      margin-bottom: 8px;
+    }
+    .toolbar button {
+      background: var(--surface);
+      color: var(--on-surface);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 7px 14px;
+      font-size: 14px;
+      cursor: pointer;
+      display: none;
+    }
+    .toolbar button.show { display: inline-flex; align-items: center; gap: 6px; }
+    .transcript {
+      flex: 1;
+      background: color-mix(in srgb, var(--surface) 85%, transparent);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 20px;
+      overflow-y: auto;
+      font-size: 24px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .transcript .interim { color: var(--muted); }
+    .placeholder {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      gap: 12px;
+    }
+    .placeholder svg { width: 56px; height: 56px; opacity: 0.5; }
+    .status {
+      text-align: center;
+      color: var(--muted);
+      min-height: 22px;
+      margin: 14px 0;
+      font-size: 15px;
+    }
+    .status.listening { color: var(--accent-2); }
+    .status.error { color: var(--rec); }
+    .mic-wrap {
+      display: flex;
+      justify-content: center;
+      padding-bottom: 6px;
+    }
+    .mic {
+      position: relative;
+      width: 96px;
+      height: 96px;
+      border: none;
+      border-radius: 50%;
+      cursor: pointer;
+      color: #fff;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      box-shadow: 0 12px 30px rgba(108,77,246,0.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.25s, box-shadow 0.25s, transform 0.1s;
+    }
+    .mic:active { transform: scale(0.96); }
+    .mic svg { width: 42px; height: 42px; }
+    .mic[disabled] {
+      background: var(--border);
+      box-shadow: none;
+      cursor: not-allowed;
+      color: var(--muted);
+    }
+    .mic.listening {
+      background: linear-gradient(135deg, var(--rec), #ff7a7d);
+      box-shadow: 0 12px 30px rgba(229,72,77,0.5);
+    }
+    .mic.listening::before,
+    .mic.listening::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: rgba(229,72,77,0.45);
+      z-index: -1;
+      animation: pulse 1.6s ease-out infinite;
+    }
+    .mic.listening::after { animation-delay: 0.8s; }
+    @keyframes pulse {
+      0%   { transform: scale(1);   opacity: 0.6; }
+      100% { transform: scale(2.1); opacity: 0;   }
+    }
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: calc(env(safe-area-inset-bottom) + 24px);
+      transform: translateX(-50%) translateY(20px);
+      background: var(--on-surface);
+      color: var(--bg);
+      padding: 10px 18px;
+      border-radius: 999px;
+      font-size: 14px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s, transform 0.2s;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+  <header>דיבור לטקסט</header>
+
+  <div class="toolbar">
+    <button id="copyBtn" type="button">📋 העתק</button>
+    <button id="clearBtn" type="button">🗑️ נקה</button>
+  </div>
+
+  <div id="transcript" class="transcript" aria-live="polite"></div>
+
+  <div id="status" class="status"></div>
+
+  <div class="mic-wrap">
+    <button id="mic" class="mic" type="button" aria-label="הקלטה" disabled>
+      <!-- mic icon -->
+      <svg id="micIcon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3z"/>
+        <path d="M17 11a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2z"/>
+      </svg>
+    </button>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script>
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    const micBtn   = document.getElementById('mic');
+    const micIcon  = document.getElementById('micIcon');
+    const transEl  = document.getElementById('transcript');
+    const statusEl = document.getElementById('status');
+    const copyBtn  = document.getElementById('copyBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const toastEl  = document.getElementById('toast');
+
+    const ICON_MIC  = '<path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3z"/><path d="M17 11a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2z"/>';
+    const ICON_STOP = '<rect x="6" y="6" width="12" height="12" rx="2"/>';
+
+    let recognition = null;
+    let listening = false;     // UI state
+    let wantListening = false;  // user intent (used to auto-restart)
+    let finalText = '';
+    let interimText = '';
+    let errorText = '';
+
+    function render() {
+      const hasText = finalText.trim() || interimText.trim();
+      if (hasText) {
+        const safe = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        transEl.innerHTML = safe(finalText) +
+          (interimText ? '<span class="interim">' + (finalText ? ' ' : '') + safe(interimText) + '</span>' : '');
+        transEl.scrollTop = transEl.scrollHeight;
+      } else {
+        transEl.innerHTML =
+          '<div class="placeholder">' +
+          '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3z"/><path d="M17 11a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2z"/></svg>' +
+          '<div>הטקסט שלך יופיע כאן</div></div>';
+      }
+
+      copyBtn.classList.toggle('show', !!hasText);
+      clearBtn.classList.toggle('show', !!hasText);
+
+      micBtn.classList.toggle('listening', listening);
+      micIcon.innerHTML = listening ? ICON_STOP : ICON_MIC;
+
+      statusEl.className = 'status';
+      if (errorText) { statusEl.textContent = errorText; statusEl.classList.add('error'); }
+      else if (listening) { statusEl.textContent = 'מקשיב...'; statusEl.classList.add('listening'); }
+      else { statusEl.textContent = 'הקש על המיקרופון כדי להתחיל'; }
+    }
+
+    function showToast(msg) {
+      toastEl.textContent = msg;
+      toastEl.classList.add('show');
+      setTimeout(() => toastEl.classList.remove('show'), 1600);
+    }
+
+    function buildRecognition() {
+      const r = new SR();
+      r.lang = 'he-IL';
+      r.continuous = true;      // honored on desktop/Android; iOS may ignore
+      r.interimResults = true;
+      r.maxAlternatives = 1;
+
+      r.onresult = (e) => {
+        let interim = '';
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          const res = e.results[i];
+          const txt = res[0].transcript;
+          if (res.isFinal) {
+            finalText = (finalText + ' ' + txt).trim();
+          } else {
+            interim += txt;
+          }
+        }
+        interimText = interim;
+        errorText = '';
+        render();
+      };
+
+      r.onerror = (e) => {
+        if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+          wantListening = false;
+          errorText = 'נא לאשר גישה למיקרופון';
+        } else if (e.error === 'no-speech' || e.error === 'aborted') {
+          // benign — onend will handle restart/stop
+        } else {
+          errorText = 'שגיאה: ' + e.error;
+        }
+      };
+
+      r.onend = () => {
+        // Safari/iOS stop after each phrase; restart to keep a continuous
+        // session going while the user still wants to listen.
+        if (wantListening) {
+          try { r.start(); return; } catch (_) { /* fall through to stop */ }
+        }
+        if (interimText) { finalText = (finalText + ' ' + interimText).trim(); interimText = ''; }
+        listening = false;
+        render();
+      };
+
+      return r;
+    }
+
+    function start() {
+      errorText = '';
+      wantListening = true;
+      recognition = buildRecognition();
+      try {
+        recognition.start();
+        listening = true;
+      } catch (err) {
+        errorText = 'שגיאה: ' + (err && err.message ? err.message : err);
+        listening = false;
+        wantListening = false;
+      }
+      render();
+    }
+
+    function stop() {
+      wantListening = false;
+      if (recognition) { try { recognition.stop(); } catch (_) {} }
+      listening = false;
+      render();
+    }
+
+    micBtn.addEventListener('click', () => (listening ? stop() : start()));
+
+    clearBtn.addEventListener('click', () => {
+      finalText = '';
+      interimText = '';
+      errorText = '';
+      render();
+    });
+
+    copyBtn.addEventListener('click', async () => {
+      const text = (finalText + (interimText ? ' ' + interimText : '')).trim();
+      if (!text) return;
+      try {
+        await navigator.clipboard.writeText(text);
+        showToast('הטקסט הועתק');
+      } catch (_) {
+        showToast('ההעתקה נכשלה');
+      }
+    });
+
+    // Feature detection
+    if (!SR) {
+      errorText = 'הדפדפן אינו תומך בזיהוי דיבור. נסה Chrome או Safari.';
+      micBtn.disabled = true;
+      render();
+    } else {
+      micBtn.disabled = false;
+      render();
+    }
+
+    // Register service worker for installability / offline shell
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>

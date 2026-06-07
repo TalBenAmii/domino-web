@@ -1,0 +1,21 @@
+{
+  "name": "דיבור לטקסט",
+  "short_name": "דיבור לטקסט",
+  "description": "Hebrew speech-to-text — tap, speak, see the text.",
+  "lang": "he",
+  "dir": "rtl",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f1020",
+  "theme_color": "#6C4DF6",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
