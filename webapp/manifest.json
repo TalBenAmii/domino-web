@@ -1,15 +1,15 @@
 {
-  "name": "דיבור לטקסט",
-  "short_name": "דיבור לטקסט",
-  "description": "Hebrew speech-to-text — tap, speak, see the text.",
+  "name": "DOMINO — תמלול קולי",
+  "short_name": "DOMINO",
+  "description": "DOMINO — תמלול עברית מהיר: הקש, דבר, קבל טקסט. מידע. תיאום. החלטה. הצלת חיים.",
   "lang": "he",
   "dir": "rtl",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#0f1020",
-  "theme_color": "#6C4DF6",
+  "background_color": "#070c15",
+  "theme_color": "#070c15",
   "icons": [
     {
       "src": "icon.svg",

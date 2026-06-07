@@ -2,7 +2,7 @@
 // loads offline. Uses a NETWORK-FIRST strategy so a freshly deployed version
 // is picked up immediately (cache-first would pin users to a stale index.html).
 // Transcription itself always needs the network — it calls the cloud Worker.
-const CACHE = 'domino-stt-v2';
+const CACHE = 'domino-stt-v3';
 const ASSETS = ['./', './index.html', './manifest.json', './icon.svg'];
 
 self.addEventListener('install', (e) => {

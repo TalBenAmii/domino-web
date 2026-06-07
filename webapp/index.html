@@ -3,82 +3,197 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>דיבור לטקסט</title>
+  <title>DOMINO — תמלול קולי</title>
 
   <!-- PWA / install metadata -->
   <link rel="manifest" href="manifest.json" />
-  <meta name="theme-color" content="#6C4DF6" />
+  <meta name="theme-color" content="#070c15" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="דיבור לטקסט" />
+  <meta name="apple-mobile-web-app-title" content="DOMINO" />
   <link rel="icon" href="icon.svg" />
   <link rel="apple-touch-icon" href="icon.svg" />
 
   <style>
     :root {
-      --accent: #6C4DF6;
-      --accent-2: #9b8bff;
-      --rec: #e5484d;
-      --bg: #0f1020;
-      --surface: #1b1c30;
-      --on-surface: #ecebf5;
-      --muted: #9a99b5;
-      --border: #2c2d47;
-    }
-    @media (prefers-color-scheme: light) {
-      :root {
-        --bg: #f5f5fb;
-        --surface: #ffffff;
-        --on-surface: #1a1a2e;
-        --muted: #6b6b85;
-        --border: #e3e3ef;
-      }
+      --bg: #070c15;
+      --bg-2: #04070d;
+      --surface: #0e1626;
+      --surface-2: #121e33;
+      --on-surface: #e9eef7;
+      --muted: #828fa6;
+      --border: #1c2940;
+      --steel: #c7d0df;
+      --red: #e11d2a;
+      --red-bright: #ff4b59;
+      --amber: #ff7a3d;
     }
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     html, body { height: 100%; margin: 0; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      background: radial-gradient(1200px 800px at 50% -10%, rgba(108,77,246,0.18), transparent), var(--bg);
       color: var(--on-surface);
+      color-scheme: dark;
       display: flex;
       flex-direction: column;
       min-height: 100dvh;
-      padding: env(safe-area-inset-top) 16px calc(env(safe-area-inset-bottom) + 16px);
+      padding: env(safe-area-inset-top) 16px calc(env(safe-area-inset-bottom) + 12px);
+      position: relative;
+      overflow-x: hidden;
+      background:
+        radial-gradient(1100px 720px at 50% -12%, rgba(225,29,42,0.12), transparent 60%),
+        radial-gradient(900px 700px at 50% 120%, rgba(42,92,168,0.13), transparent 62%),
+        linear-gradient(180deg, var(--bg), var(--bg-2));
     }
-    header {
-      text-align: center;
-      padding: 18px 0 10px;
-      font-size: 20px;
-      font-weight: 700;
-      letter-spacing: 0.2px;
+    /* faint command-center grid, fading toward the edges */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      background-image:
+        linear-gradient(rgba(96,142,210,0.045) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(96,142,210,0.045) 1px, transparent 1px);
+      background-size: 40px 40px;
+      -webkit-mask-image: radial-gradient(circle at 50% 32%, #000 0%, transparent 78%);
+              mask-image: radial-gradient(circle at 50% 32%, #000 0%, transparent 78%);
     }
-    .toolbar {
+    body > * { position: relative; z-index: 1; }
+
+    /* ── Brand header ─────────────────────────────────────────────────── */
+    .brand {
       display: flex;
-      justify-content: flex-start;
-      gap: 8px;
-      min-height: 36px;
-      margin-bottom: 8px;
+      flex-direction: column;
+      align-items: center;
+      gap: 9px;
+      padding: 18px 0 12px;
+      text-align: center;
     }
-    .toolbar button {
-      background: var(--surface);
+    .brand-row { display: flex; align-items: center; gap: 13px; }
+    .brand-mark { width: 56px; height: 38px; flex: none; filter: drop-shadow(0 4px 10px rgba(225,29,42,0.35)); }
+    .wordmark {
+      font-size: 38px;
+      font-weight: 800;
+      letter-spacing: 4px;
+      line-height: 1;
+      color: #f3f6fc;
+    }
+    /* custom dotted "i" — white stem, red dot, matching the logo */
+    .wordmark .i {
+      position: relative;
+      display: inline-block;
+      width: 0.2em;
+      height: 0.78em;
+      margin: 0 0.05em;
+      vertical-align: baseline;
+    }
+    .wordmark .i::before {
+      content: "";
+      position: absolute;
+      left: 0; bottom: 0;
+      width: 100%;
+      height: 0.54em;
+      border-radius: 0.06em;
+      background: linear-gradient(180deg, #f6f8fd, #cfd7e5);
+    }
+    .wordmark .i .i-dot {
+      position: absolute;
+      left: 50%; top: 0;
+      transform: translateX(-50%);
+      width: 0.2em; height: 0.2em;
+      border-radius: 0.06em;
+      background: var(--red);
+      box-shadow: 0 0 0.5em rgba(225,29,42,0.85);
+    }
+    .tagline {
+      font-size: 10px;
+      letter-spacing: 2px;
+      color: var(--muted);
+      text-transform: uppercase;
+      max-width: 320px;
+    }
+
+    /* ── Transcript panel (HUD-style) ─────────────────────────────────── */
+    .panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      overflow: hidden;
+      position: relative;
+      background: linear-gradient(180deg, rgba(14,22,38,0.92), rgba(9,15,27,0.92));
+      transition: border-color .25s, box-shadow .25s;
+    }
+    .panel::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--red), transparent);
+      opacity: 0.75;
+    }
+    body.is-recording .panel {
+      border-color: rgba(225,29,42,0.5);
+      box-shadow: 0 0 0 1px rgba(225,29,42,0.18), 0 0 34px rgba(225,29,42,0.12);
+    }
+    .panel-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 11px 14px;
+      min-height: 46px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(255,255,255,0.015);
+    }
+    .panel-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      letter-spacing: 1.5px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+    .live-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--muted);
+      transition: background .25s, box-shadow .25s;
+    }
+    body.is-recording .live-dot {
+      background: var(--red);
+      box-shadow: 0 0 8px rgba(225,29,42,0.9);
+      animation: blink 1.2s ease-in-out infinite;
+    }
+    @keyframes blink { 50% { opacity: 0.3; } }
+
+    .panel-actions { display: flex; gap: 8px; }
+    .panel-actions button {
+      background: var(--surface-2);
       color: var(--on-surface);
       border: 1px solid var(--border);
       border-radius: 999px;
-      padding: 7px 14px;
-      font-size: 14px;
+      padding: 6px 12px;
+      font-size: 13px;
       cursor: pointer;
       display: none;
+      align-items: center;
+      gap: 5px;
+      transition: border-color .2s, background .2s;
     }
-    .toolbar button.show { display: inline-flex; align-items: center; gap: 6px; }
+    .panel-actions button:hover { border-color: var(--red); }
+    .panel-actions button.show { display: inline-flex; }
+
     .transcript {
       flex: 1;
-      background: color-mix(in srgb, var(--surface) 85%, transparent);
-      border: 1px solid var(--border);
-      border-radius: 24px;
-      padding: 20px;
       overflow-y: auto;
-      font-size: 24px;
+      padding: 20px;
+      font-size: 23px;
       line-height: 1.6;
       white-space: pre-wrap;
       word-break: break-word;
@@ -90,22 +205,29 @@
       align-items: center;
       justify-content: center;
       color: var(--muted);
-      gap: 12px;
+      gap: 14px;
+      text-align: center;
     }
-    .placeholder svg { width: 56px; height: 56px; opacity: 0.5; }
+    .placeholder svg { width: 54px; height: 54px; opacity: 0.45; }
+    .placeholder div { font-size: 16px; letter-spacing: 0.5px; }
+
+    /* ── Status line ──────────────────────────────────────────────────── */
     .status {
       text-align: center;
       color: var(--muted);
       min-height: 22px;
-      margin: 14px 0;
+      margin: 16px 0 12px;
       font-size: 15px;
+      letter-spacing: 0.3px;
     }
-    .status.active { color: var(--accent-2); }
-    .status.error { color: var(--rec); }
+    .status.active { color: var(--red-bright); }
+    .status.error  { color: var(--amber); font-weight: 600; }
+
+    /* ── Mic button ───────────────────────────────────────────────────── */
     .mic-wrap {
       display: flex;
       justify-content: center;
-      padding-bottom: 6px;
+      padding-bottom: 4px;
     }
     .mic {
       position: relative;
@@ -115,8 +237,8 @@
       border-radius: 50%;
       cursor: pointer;
       color: #fff;
-      background: linear-gradient(135deg, var(--accent), var(--accent-2));
-      box-shadow: 0 12px 30px rgba(108,77,246,0.45);
+      background: linear-gradient(135deg, var(--red), var(--red-bright));
+      box-shadow: 0 14px 34px rgba(225,29,42,0.42), inset 0 1px 0 rgba(255,255,255,0.25);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -125,14 +247,15 @@
     .mic:active { transform: scale(0.96); }
     .mic svg { width: 42px; height: 42px; }
     .mic[disabled] {
-      background: var(--border);
+      background: var(--surface-2);
+      border: 1px solid var(--border);
       box-shadow: none;
       cursor: not-allowed;
       color: var(--muted);
     }
     .mic.recording {
-      background: linear-gradient(135deg, var(--rec), #ff7a7d);
-      box-shadow: 0 12px 30px rgba(229,72,77,0.5);
+      background: linear-gradient(135deg, #ff2333, #ff6b76);
+      box-shadow: 0 14px 40px rgba(225,29,42,0.6), inset 0 1px 0 rgba(255,255,255,0.3);
     }
     .mic.recording::before,
     .mic.recording::after {
@@ -140,7 +263,7 @@
       position: absolute;
       inset: 0;
       border-radius: 50%;
-      background: rgba(229,72,77,0.45);
+      background: rgba(225,29,42,0.45);
       z-index: -1;
       animation: pulse 1.6s ease-out infinite;
     }
@@ -156,32 +279,67 @@
       transform-origin: center;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Footer tagline (Hebrew) ──────────────────────────────────────── */
+    .footer-tag {
+      text-align: center;
+      padding: 12px 0 2px;
+      font-size: 11px;
+      letter-spacing: 2px;
+      color: rgba(225,29,42,0.82);
+      font-weight: 600;
+    }
+
+    /* ── Toast ────────────────────────────────────────────────────────── */
     .toast {
       position: fixed;
       left: 50%;
       bottom: calc(env(safe-area-inset-bottom) + 24px);
       transform: translateX(-50%) translateY(20px);
-      background: var(--on-surface);
-      color: var(--bg);
+      background: var(--surface-2);
+      color: var(--on-surface);
+      border: 1px solid var(--border);
       padding: 10px 18px;
       border-radius: 999px;
       font-size: 14px;
       opacity: 0;
       pointer-events: none;
       transition: opacity 0.2s, transform 0.2s;
+      z-index: 5;
     }
     .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
   </style>
 </head>
 <body>
-  <header>דיבור לטקסט</header>
+  <header class="brand">
+    <div class="brand-row">
+      <svg class="brand-mark" viewBox="0 0 60 40" fill="none" aria-hidden="true">
+        <!-- toppling steel dominoes -->
+        <rect x="3"  y="13" width="8.5" height="21" rx="2.4" fill="#9fb0c7" transform="rotate(-17 7 23)"/>
+        <rect x="13" y="10" width="8.5" height="24" rx="2.4" fill="#c4cfdf" transform="rotate(-9 17 22)"/>
+        <rect x="24" y="8"  width="8.5" height="26" rx="2.4" fill="#e8edf5" transform="rotate(-3 28 21)"/>
+        <!-- red medical tile -->
+        <rect x="39" y="6" width="17" height="29" rx="4" fill="#e11d2a"/>
+        <rect x="41" y="8" width="13" height="5" rx="2.5" fill="#ffffff" opacity="0.18"/>
+        <!-- white cross -->
+        <rect x="45.7" y="11"   width="3.6" height="19" rx="1.6" fill="#ffffff"/>
+        <rect x="41"   y="18.7" width="13"  height="3.6" rx="1.6" fill="#ffffff"/>
+      </svg>
+      <span class="wordmark">DOM<span class="i"><span class="i-dot"></span></span>NO</span>
+    </div>
+    <div class="tagline">Decision-Oriented Medical Information &amp; Network Operations</div>
+  </header>
 
-  <div class="toolbar">
-    <button id="copyBtn" type="button">📋 העתק</button>
-    <button id="clearBtn" type="button">🗑️ נקה</button>
-  </div>
-
-  <div id="transcript" class="transcript" aria-live="polite"></div>
+  <main class="panel">
+    <div class="panel-head">
+      <span class="panel-title"><span class="live-dot"></span> תמלול חי</span>
+      <div class="panel-actions">
+        <button id="copyBtn" type="button">📋 העתק</button>
+        <button id="clearBtn" type="button">🗑️ נקה</button>
+      </div>
+    </div>
+    <div id="transcript" class="transcript" aria-live="polite"></div>
+  </main>
 
   <div id="status" class="status"></div>
 
@@ -194,12 +352,13 @@
     </button>
   </div>
 
+  <div class="footer-tag">מידע · תיאום · החלטה · הצלת חיים</div>
+
   <div id="toast" class="toast"></div>
 
   <script>
     // ── Backend endpoint ──────────────────────────────────────────────────
     // Cloudflare Worker that holds the Groq API key and calls Whisper.
-    // Replace the placeholder below with your deployed Worker URL.
     const WORKER_URL = 'https://domino-stt.talba225.workers.dev/';
     // ──────────────────────────────────────────────────────────────────────
 
@@ -242,6 +401,10 @@
       micBtn.classList.toggle('recording', recording);
       micBtn.classList.toggle('busy', busy);
       micIcon.innerHTML = busy ? ICON_SPIN : (recording ? ICON_STOP : ICON_MIC);
+
+      // drive HUD theming (live dot, panel glow)
+      document.body.classList.toggle('is-recording', recording);
+      document.body.classList.toggle('is-busy', busy);
 
       statusEl.className = 'status';
       if (errorText)        { statusEl.textContent = errorText;            statusEl.classList.add('error'); }

@@ -1,13 +1,28 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#6C4DF6"/>
-      <stop offset="1" stop-color="#9b8bff"/>
+    <radialGradient id="bg" cx="50%" cy="34%" r="80%">
+      <stop offset="0" stop-color="#102136"/>
+      <stop offset="1" stop-color="#070c15"/>
+    </radialGradient>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ff3543"/>
+      <stop offset="1" stop-color="#d11320"/>
     </linearGradient>
   </defs>
-  <rect width="512" height="512" rx="112" fill="url(#g)"/>
-  <g fill="#ffffff">
-    <rect x="208" y="96" width="96" height="208" rx="48"/>
-    <path d="M160 232a96 96 0 0 0 192 0h40a136 136 0 0 1-116 134.5V416h56v40H180v-40h56v-49.5A136 136 0 0 1 120 232z"/>
-  </g>
+
+  <!-- full-bleed dark background (maskable safe) -->
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <circle cx="256" cy="200" r="190" fill="#e11d2a" opacity="0.10"/>
+
+  <!-- toppling steel dominoes leaning into the medical tile -->
+  <rect x="92"  y="172" width="48" height="208" rx="16" fill="#9fb0c7" transform="rotate(-15 116 276)"/>
+  <rect x="140" y="150" width="50" height="226" rx="16" fill="#c4cfdf" transform="rotate(-8 165 263)"/>
+
+  <!-- red medical tile -->
+  <rect x="184" y="120" width="160" height="272" rx="30" fill="url(#tile)"/>
+  <rect x="200" y="136" width="128" height="34" rx="17" fill="#ffffff" opacity="0.16"/>
+
+  <!-- white medical cross -->
+  <rect x="250" y="180" width="28" height="152" rx="12" fill="#ffffff"/>
+  <rect x="188" y="242" width="152" height="28" rx="12" fill="#ffffff"/>
 </svg>
