@@ -83,7 +83,6 @@
       white-space: pre-wrap;
       word-break: break-word;
     }
-    .transcript .interim { color: var(--muted); }
     .placeholder {
       height: 100%;
       display: flex;
@@ -101,7 +100,7 @@
       margin: 14px 0;
       font-size: 15px;
     }
-    .status.listening { color: var(--accent-2); }
+    .status.active { color: var(--accent-2); }
     .status.error { color: var(--rec); }
     .mic-wrap {
       display: flex;
@@ -131,12 +130,12 @@
       cursor: not-allowed;
       color: var(--muted);
     }
-    .mic.listening {
+    .mic.recording {
       background: linear-gradient(135deg, var(--rec), #ff7a7d);
       box-shadow: 0 12px 30px rgba(229,72,77,0.5);
     }
-    .mic.listening::before,
-    .mic.listening::after {
+    .mic.recording::before,
+    .mic.recording::after {
       content: "";
       position: absolute;
       inset: 0;
@@ -145,11 +144,18 @@
       z-index: -1;
       animation: pulse 1.6s ease-out infinite;
     }
-    .mic.listening::after { animation-delay: 0.8s; }
+    .mic.recording::after { animation-delay: 0.8s; }
     @keyframes pulse {
       0%   { transform: scale(1);   opacity: 0.6; }
       100% { transform: scale(2.1); opacity: 0;   }
     }
+    .mic.busy { cursor: progress; }
+    .mic.busy svg {
+      animation: spin 0.8s linear infinite;
+      transform-box: fill-box;
+      transform-origin: center;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
     .toast {
       position: fixed;
       left: 50%;
@@ -181,7 +187,6 @@
 
   <div class="mic-wrap">
     <button id="mic" class="mic" type="button" aria-label="הקלטה" disabled>
-      <!-- mic icon -->
       <svg id="micIcon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
         <path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3z"/>
         <path d="M17 11a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2z"/>
@@ -192,7 +197,11 @@
   <div id="toast" class="toast"></div>
 
   <script>
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    // ── Backend endpoint ──────────────────────────────────────────────────
+    // Cloudflare Worker that holds the Groq API key and calls Whisper.
+    // Replace the placeholder below with your deployed Worker URL.
+    const WORKER_URL = 'https://domino-stt.talba225.workers.dev/';
+    // ──────────────────────────────────────────────────────────────────────
 
     const micBtn   = document.getElementById('mic');
     const micIcon  = document.getElementById('micIcon');
@@ -204,20 +213,21 @@
 
     const ICON_MIC  = '<path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3z"/><path d="M17 11a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2z"/>';
     const ICON_STOP = '<rect x="6" y="6" width="12" height="12" rx="2"/>';
+    const ICON_SPIN = '<circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="42 60"/>';
 
-    let recognition = null;
-    let listening = false;     // UI state
-    let wantListening = false;  // user intent (used to auto-restart)
-    let finalText = '';
-    let interimText = '';
-    let errorText = '';
+    let mediaRecorder = null;
+    let mediaStream   = null;
+    let chunks        = [];
+    let recording     = false;  // mic is capturing
+    let busy          = false;  // uploading + transcribing
+    let finalText     = '';
+    let errorText     = '';
 
     function render() {
-      const hasText = finalText.trim() || interimText.trim();
+      const hasText = !!finalText.trim();
       if (hasText) {
         const safe = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-        transEl.innerHTML = safe(finalText) +
-          (interimText ? '<span class="interim">' + (finalText ? ' ' : '') + safe(interimText) + '</span>' : '');
+        transEl.innerHTML = safe(finalText);
         transEl.scrollTop = transEl.scrollHeight;
       } else {
         transEl.innerHTML =
@@ -226,16 +236,18 @@
           '<div>הטקסט שלך יופיע כאן</div></div>';
       }
 
-      copyBtn.classList.toggle('show', !!hasText);
-      clearBtn.classList.toggle('show', !!hasText);
+      copyBtn.classList.toggle('show', hasText);
+      clearBtn.classList.toggle('show', hasText);
 
-      micBtn.classList.toggle('listening', listening);
-      micIcon.innerHTML = listening ? ICON_STOP : ICON_MIC;
+      micBtn.classList.toggle('recording', recording);
+      micBtn.classList.toggle('busy', busy);
+      micIcon.innerHTML = busy ? ICON_SPIN : (recording ? ICON_STOP : ICON_MIC);
 
       statusEl.className = 'status';
-      if (errorText) { statusEl.textContent = errorText; statusEl.classList.add('error'); }
-      else if (listening) { statusEl.textContent = 'מקשיב...'; statusEl.classList.add('listening'); }
-      else { statusEl.textContent = 'הקש על המיקרופון כדי להתחיל'; }
+      if (errorText)        { statusEl.textContent = errorText;            statusEl.classList.add('error'); }
+      else if (busy)        { statusEl.textContent = 'מתמלל…';             statusEl.classList.add('active'); }
+      else if (recording)   { statusEl.textContent = 'מקליט… הקש לסיום';   statusEl.classList.add('active'); }
+      else                  { statusEl.textContent = 'הקש על המיקרופון כדי להתחיל'; }
     }
 
     function showToast(msg) {
@@ -244,107 +256,112 @@
       setTimeout(() => toastEl.classList.remove('show'), 1600);
     }
 
-    function buildRecognition() {
-      const r = new SR();
-      r.lang = 'he-IL';
-      r.continuous = true;      // honored on desktop/Android; iOS may ignore
-      r.interimResults = true;
-      r.maxAlternatives = 1;
-
-      r.onresult = (e) => {
-        let interim = '';
-        for (let i = e.resultIndex; i < e.results.length; i++) {
-          const res = e.results[i];
-          const txt = res[0].transcript;
-          if (res.isFinal) {
-            finalText = (finalText + ' ' + txt).trim();
-          } else {
-            interim += txt;
-          }
-        }
-        interimText = interim;
-        errorText = '';
-        render();
-      };
-
-      r.onerror = (e) => {
-        if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
-          wantListening = false;
-          errorText = 'נא לאשר גישה למיקרופון';
-        } else if (e.error === 'no-speech' || e.error === 'aborted') {
-          // benign — onend will handle restart/stop
-        } else {
-          errorText = 'שגיאה: ' + e.error;
-        }
-      };
-
-      r.onend = () => {
-        // Safari/iOS stop after each phrase; restart to keep a continuous
-        // session going while the user still wants to listen.
-        if (wantListening) {
-          try { r.start(); return; } catch (_) { /* fall through to stop */ }
-        }
-        if (interimText) { finalText = (finalText + ' ' + interimText).trim(); interimText = ''; }
-        listening = false;
-        render();
-      };
-
-      return r;
-    }
-
-    function start() {
-      errorText = '';
-      wantListening = true;
-      recognition = buildRecognition();
-      try {
-        recognition.start();
-        listening = true;
-      } catch (err) {
-        errorText = 'שגיאה: ' + (err && err.message ? err.message : err);
-        listening = false;
-        wantListening = false;
+    function pickMime() {
+      const cands = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/mp4',
+        'audio/ogg;codecs=opus',
+        'audio/aac',
+      ];
+      for (const c of cands) {
+        try { if (window.MediaRecorder && MediaRecorder.isTypeSupported(c)) return c; } catch (_) {}
       }
+      return '';
+    }
+
+    async function startRecording() {
+      errorText = '';
+      try {
+        mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch (_) {
+        errorText = 'נא לאשר גישה למיקרופון';
+        render();
+        return;
+      }
+      const mime = pickMime();
+      try {
+        mediaRecorder = mime ? new MediaRecorder(mediaStream, { mimeType: mime })
+                             : new MediaRecorder(mediaStream);
+      } catch (_) {
+        mediaRecorder = new MediaRecorder(mediaStream);
+      }
+      chunks = [];
+      mediaRecorder.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+      mediaRecorder.onstop = transcribe;
+      mediaRecorder.start();
+      recording = true;
       render();
     }
 
-    function stop() {
-      wantListening = false;
-      if (recognition) { try { recognition.stop(); } catch (_) {} }
-      listening = false;
+    function stopRecording() {
+      recording = false;
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        try { mediaRecorder.stop(); } catch (_) {}   // fires onstop -> transcribe()
+      }
+      if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
       render();
     }
 
-    micBtn.addEventListener('click', () => (listening ? stop() : start()));
+    async function transcribe() {
+      const type = (mediaRecorder && mediaRecorder.mimeType) ||
+                   (chunks[0] && chunks[0].type) || 'audio/webm';
+      const blob = new Blob(chunks, { type });
+      chunks = [];
+      if (!blob.size) { render(); return; }
+
+      busy = true; errorText = ''; render();
+      try {
+        const res = await fetch(WORKER_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': type },
+          body: blob,
+        });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        const text = (data && data.text ? String(data.text) : '').trim();
+        if (text) finalText = finalText ? (finalText + ' ' + text) : text;
+        else showToast('לא זוהה דיבור');
+      } catch (_) {
+        errorText = 'שגיאת תמלול — בדוק חיבור ונסה שוב';
+      } finally {
+        busy = false;
+        render();
+      }
+    }
+
+    micBtn.addEventListener('click', () => {
+      if (busy) return;
+      recording ? stopRecording() : startRecording();
+    });
 
     clearBtn.addEventListener('click', () => {
       finalText = '';
-      interimText = '';
       errorText = '';
       render();
     });
 
     copyBtn.addEventListener('click', async () => {
-      const text = (finalText + (interimText ? ' ' + interimText : '')).trim();
+      const text = finalText.trim();
       if (!text) return;
-      try {
-        await navigator.clipboard.writeText(text);
-        showToast('הטקסט הועתק');
-      } catch (_) {
-        showToast('ההעתקה נכשלה');
-      }
+      try { await navigator.clipboard.writeText(text); showToast('הטקסט הועתק'); }
+      catch (_) { showToast('ההעתקה נכשלה'); }
     });
 
-    // Feature detection
-    if (!SR) {
-      errorText = 'הדפדפן אינו תומך בזיהוי דיבור. נסה Chrome או Safari.';
+    // Feature detection — getUserMedia + MediaRecorder are supported in every
+    // modern browser (Chrome, Edge, Firefox, Safari, iOS).
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder) {
+      errorText = 'הדפדפן אינו תומך בהקלטת אודיו.';
       micBtn.disabled = true;
-      render();
+    } else if (!WORKER_URL || WORKER_URL.indexOf('__') === 0) {
+      errorText = 'השרת לא הוגדר עדיין.';
+      micBtn.disabled = true;
     } else {
       micBtn.disabled = false;
-      render();
     }
+    render();
 
-    // Register service worker for installability / offline shell
+    // Register service worker for installability / offline shell.
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('sw.js').catch(() => {});
