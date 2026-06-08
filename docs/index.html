@@ -427,6 +427,7 @@
     let interimTimer  = null;
     let inFlight      = false;  // an interim request is in flight
     let committing    = false;  // a window rotate / final stop is in progress
+    let commitChain   = Promise.resolve();  // serializes commit appends in window order
 
     let belowSinceTs  = 0;      // when audio first dropped below SILENCE_RMS (0 = above)
     let isSilent      = false;
@@ -514,6 +515,7 @@
     }
 
     function startWindowRecorder() {
+      if (!mediaStream) return;   // stream torn down (e.g. stop during rotation) — nothing to record
       try {
         mediaRecorder = currentMime ? new MediaRecorder(mediaStream, { mimeType: currentMime })
                                     : new MediaRecorder(mediaStream);
@@ -550,9 +552,15 @@
       if (wasFinalizing) cleanupStream();
       else               startWindowRecorder();   // open the next window immediately
 
-      if (blob && blob.size) commitTranscribe(blob, wasFinalizing);
-      else if (wasFinalizing) finishIdle();
-      else render();
+      // Serialize commits so committed text stays in window order even if a
+      // slower v3 request for an earlier window resolves after a later one's.
+      if (blob && blob.size) {
+        commitChain = commitChain.then(() => commitTranscribe(blob, wasFinalizing)).catch(() => {});
+      } else if (wasFinalizing) {
+        commitChain = commitChain.then(() => finishIdle()).catch(() => {});
+      } else {
+        render();
+      }
     }
 
     // Accurate (v3) transcription of a finished window; appends to permanent text.
@@ -601,6 +609,12 @@
       stopInterimTimer();
       stopSilenceMonitor();
       render();   // show the finalizing spinner
+      if (committing) {
+        // A window rotation is already mid-flight (maybeCommit already called
+        // stop()). Its queued onWindowStop now sees finalizing=true and will
+        // flush the final window, clean up, and go idle. Don't stop() twice.
+        return;
+      }
       if (mediaRecorder && mediaRecorder.state !== 'inactive') {
         committing = true;
         try { mediaRecorder.stop(); }            // onstop flushes the final window + finishIdle
