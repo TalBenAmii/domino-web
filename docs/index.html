@@ -308,6 +308,34 @@
       z-index: 5;
     }
     .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* ── Update prompt ────────────────────────────────────────────────── */
+    .update-pill {
+      position: fixed;
+      left: 50%;
+      top: calc(env(safe-area-inset-top) + 12px);
+      transform: translateX(-50%) translateY(-16px);
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      background: var(--surface-2);
+      color: var(--on-surface);
+      border: 1px solid var(--red-bright);
+      padding: 9px 16px;
+      border-radius: 999px;
+      font: inherit;
+      font-size: 14px;
+      cursor: pointer;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s, transform 0.2s;
+      z-index: 10;
+    }
+    .update-pill.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+      pointer-events: auto;
+    }
   </style>
 </head>
 <body>
@@ -355,6 +383,9 @@
   <div class="footer-tag">מידע · תיאום · החלטה · הצלת חיים</div>
 
   <div id="toast" class="toast"></div>
+  <button id="updatePill" class="update-pill" type="button">
+    <span aria-hidden="true">🔄</span> גרסה חדשה זמינה · רענן
+  </button>
 
   <script>
     // ── Backend endpoint ──────────────────────────────────────────────────
@@ -524,10 +555,54 @@
     }
     render();
 
-    // Register service worker for installability / offline shell.
+    // Register service worker for installability / offline shell, plus
+    // freshness handling so users never need a hard refresh:
+    //  - updateViaCache:'none' => the browser always checks the network for a
+    //    new sw.js instead of reusing GitHub Pages' 10-minute cached copy;
+    //  - we re-check for updates on focus and hourly;
+    //  - when a new version finishes installing we show a tappable pill, and
+    //    the user refreshes on their own terms (never mid-recording).
     if ('serviceWorker' in navigator) {
+      const updatePill = document.getElementById('updatePill');
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js').catch(() => {});
+        // Remember whether a controller already exists so the first-ever install
+        // (null -> controller via clients.claim) doesn't trigger a reload.
+        const hadController = !!navigator.serviceWorker.controller;
+        let refreshing = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (refreshing || !hadController) return;
+          refreshing = true;
+          window.location.reload();
+        });
+
+        navigator.serviceWorker
+          .register('sw.js', { updateViaCache: 'none' })
+          .then((reg) => {
+            const checkForUpdate = () => reg.update().catch(() => {});
+            checkForUpdate();
+            setInterval(checkForUpdate, 60 * 60 * 1000);
+            document.addEventListener('visibilitychange', () => {
+              if (document.visibilityState === 'visible') checkForUpdate();
+            });
+
+            reg.addEventListener('updatefound', () => {
+              const incoming = reg.installing;
+              if (!incoming) return;
+              incoming.addEventListener('statechange', () => {
+                // A new version finished installing while an old one still
+                // controls the page => offer the refresh (first install has no
+                // controller, so it stays silent).
+                if (incoming.state === 'installed' && navigator.serviceWorker.controller) {
+                  updatePill.classList.add('show');
+                  updatePill.onclick = () => {
+                    updatePill.classList.remove('show');
+                    incoming.postMessage({ type: 'SKIP_WAITING' });
+                  };
+                }
+              });
+            });
+          })
+          .catch(() => {});
       });
     }
   </script>
