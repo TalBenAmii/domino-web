@@ -20,7 +20,11 @@
 // ─────────────────────────────────────────────────────────────────────────
 
 const GROQ_URL = 'https://api.groq.com/openai/v1/audio/transcriptions';
-const MODEL = 'whisper-large-v3';
+const MODELS = {
+  turbo: 'whisper-large-v3-turbo',
+  v3: 'whisper-large-v3',
+};
+const DEFAULT_MODEL = 'v3';
 const LANGUAGE = 'he';
 
 const CORS = {
@@ -58,9 +62,12 @@ export default {
     const buf = await request.arrayBuffer();
     if (!buf || buf.byteLength === 0) return json({ error: 'empty audio' }, 400);
 
+    const modelKey = new URL(request.url).searchParams.get('model');
+    const model = MODELS[modelKey] || MODELS[DEFAULT_MODEL];
+
     const form = new FormData();
     form.append('file', new Blob([buf], { type }), 'audio.' + extFor(type));
-    form.append('model', MODEL);
+    form.append('model', model);
     form.append('language', LANGUAGE);
     form.append('response_format', 'json');
     form.append('temperature', '0');
