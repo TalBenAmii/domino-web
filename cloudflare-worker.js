@@ -15,8 +15,9 @@
 //   5. Copy the Worker URL (looks like https://domino-stt.<you>.workers.dev)
 //      and send it to me — I'll drop it into the web app and push it live.
 //
-// Model note: whisper-large-v3 gives the best Hebrew accuracy. For lower
-// latency at a small accuracy cost, swap MODEL to 'whisper-large-v3-turbo'.
+// Model note: whisper-large-v3 gives the best Hebrew accuracy; the faster,
+// cheaper whisper-large-v3-turbo is selected per-request via ?model=turbo
+// (default, and any unknown value, is v3). See MODELS below.
 // ─────────────────────────────────────────────────────────────────────────
 
 const GROQ_URL = 'https://api.groq.com/openai/v1/audio/transcriptions';
@@ -24,7 +25,7 @@ const MODELS = {
   turbo: 'whisper-large-v3-turbo',
   v3: 'whisper-large-v3',
 };
-const DEFAULT_MODEL = 'v3';
+const DEFAULT_MODEL = 'v3';   // key into MODELS, not a model name
 const LANGUAGE = 'he';
 
 const CORS = {
